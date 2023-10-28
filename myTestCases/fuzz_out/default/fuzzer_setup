@@ -1,0 +1,6 @@
+# environment variables:
+AFL_CUSTOM_INFO_PROGRAM=/Users/shuangxiangkan/Fuzz/AFLplusplus/myTestCases/main
+AFL_CUSTOM_INFO_PROGRAM_ARGV=
+AFL_CUSTOM_INFO_OUT=/Users/shuangxiangkan/Fuzz/AFLplusplus/myTestCases/fuzz_out/default
+# command line:
+'/Users/shuangxiangkan/Fuzz/AFLplusplus/afl-fuzz' '-i' '/Users/shuangxiangkan/Fuzz/AFLplusplus/myTestCases/fuzz_in' '-o' '/Users/shuangxiangkan/Fuzz/AFLplusplus/myTestCases/fuzz_out' '/Users/shuangxiangkan/Fuzz/AFLplusplus/myTestCases/main'
