@@ -1,0 +1,31 @@
+错误1：
+[-]  SYSTEM ERROR : shmget() failed, try running afl-system-config
+    Stop location : afl_shm_init(), src/afl-sharedmem.c:284
+       OS message : Invalid argument
+
+解决方法：
+sudo /Users/shuangxiangkan/Fuzz/AFLplusplus/afl-system-config
+
+
+
+https://github.com/rust-fuzz/afl.rs/issues/195
+
+
+错误2：
+[-]  SYSTEM ERROR : shmget() failed, try running afl-system-config
+    Stop location : afl_shm_init(), src/afl-sharedmem.c:284
+       OS message : Cannot allocate memory
+
+是共享内存有问题，查看共享内存：ipcs -m
+% ipcs -m
+IPC status from <running system> as of Fri Oct 27 17:57:44 AEDT 2023
+T     ID     KEY        MODE       OWNER    GROUP
+Shared Memory:
+m 131072 0xca12c379 --rw------- shuangxiangkan    staff
+m 131073 0x51127887 --rw------- shuangxiangkan    staff
+m 131074 0x00000000 --rw------- shuangxiangkan    staff
+m 131075 0x00000000 --rw------- shuangxiangkan    staff
+m 262148 0x00000000 --rw------- shuangxiangkan    staff
+
+删除共享内存即可：ipcrm -m ID
+比如：ipcrm -m 262148

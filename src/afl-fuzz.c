@@ -2181,9 +2181,15 @@ int main(int argc, char **argv_orig, char **envp) {
 
   }
 
+  // 初始化共享内存trace_bits
   afl->argv = use_argv;
   afl->fsrv.trace_bits =
       afl_shm_init(&afl->shm, afl->fsrv.map_size, afl->non_instrumented_mode);
+
+  afl->fsrv.spec_num = afl_shm_spec_init(&afl->shm, afl->non_instrumented_mode);
+  
+
+  printf("\n --------------------------1. afl->fsrv.trace_bits \n");
 
   if (!afl->non_instrumented_mode && !afl->fsrv.qemu_mode &&
       !afl->unicorn_mode && !afl->fsrv.frida_mode && !afl->fsrv.cs_mode &&
@@ -2236,6 +2242,9 @@ int main(int argc, char **argv_orig, char **envp) {
       afl->fsrv.map_size = new_map_size;
       afl->fsrv.trace_bits =
           afl_shm_init(&afl->shm, new_map_size, afl->non_instrumented_mode);
+
+      printf("\n --------------------------2. afl->fsrv.trace_bits \n");
+      
       setenv("AFL_NO_AUTODICT", "1", 1);  // loaded already
       afl_fsrv_start(&afl->fsrv, afl->argv, &afl->stop_soon,
                      afl->afl_env.afl_debug_child);
@@ -2316,6 +2325,9 @@ int main(int argc, char **argv_orig, char **envp) {
       setenv("AFL_NO_AUTODICT", "1", 1);  // loaded already
       afl->fsrv.trace_bits =
           afl_shm_init(&afl->shm, new_map_size, afl->non_instrumented_mode);
+
+      printf("\n --------------------------3. afl->fsrv.trace_bits \n");
+
       afl->cmplog_fsrv.trace_bits = afl->fsrv.trace_bits;
       afl_fsrv_start(&afl->fsrv, afl->argv, &afl->stop_soon,
                      afl->afl_env.afl_debug_child);
@@ -2483,6 +2495,7 @@ int main(int argc, char **argv_orig, char **envp) {
   OKF("Writing mutation introspection to '%s'", ifn);
   #endif
 
+  // while (1)
   while (likely(!afl->stop_soon)) {
 
     cull_queue(afl);

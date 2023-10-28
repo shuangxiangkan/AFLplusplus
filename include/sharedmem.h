@@ -44,9 +44,11 @@ typedef struct sharedmem {
 #else
   s32 shm_id;                          /* ID of the SHM region              */
   s32 cmplog_shm_id;
+  s32 shm_spec_id;
 #endif
 
   u8 *map;                                          /* shared memory region */
+  u32 *spec_map;                                    /* shared spec memory region */
 
   size_t map_size;                                 /* actual allocated size */
 
@@ -58,6 +60,9 @@ typedef struct sharedmem {
 
 u8  *afl_shm_init(sharedmem_t *, size_t, unsigned char non_instrumented_mode);
 void afl_shm_deinit(sharedmem_t *);
+
+u32  *afl_shm_spec_init(sharedmem_t *, unsigned char non_instrumented_mode);
+void afl_shm_spec_deinit(sharedmem_t *);
 
 #endif
 

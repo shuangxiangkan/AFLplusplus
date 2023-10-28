@@ -365,3 +365,35 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
 
 }
 
+u32 *afl_shm_spec_init(sharedmem_t *shm, unsigned char non_instrumented_mode) {
+
+  u8 *shm_spec_str;
+
+  shm->shm_spec_id = shmget(IPC_PRIVATE, API_SPEC_SIZE, IPC_CREAT | IPC_EXCL | DEFAULT_PERMISSION);
+
+  if (shm->shm_spec_id < 0) {
+
+    PFATAL("shmget() spec failed, try running afl-system-config");
+
+  }
+
+  if (!non_instrumented_mode) {
+
+    shm_spec_str = alloc_printf("%d", shm->shm_spec_id);
+    setenv(SHM_SPEC_VAR, shm_spec_str, 1);
+    ck_free(shm_spec_str);//
+
+  }
+
+  shm->spec_map = shmat(shm->shm_spec_id, NULL, 0);
+
+  if (shm->spec_map == (void *)-1 || !shm->spec_map) {
+
+    shmctl(shm->shm_spec_id, IPC_RMID, NULL);  // do not leak shmem
+
+    PFATAL("shmat() spec failed");
+
+  }
+
+  return shm->spec_map;
+}

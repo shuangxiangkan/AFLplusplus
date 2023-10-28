@@ -153,6 +153,7 @@ class ModuleSanitizerCoverageAFL
                                  uint32_t special);
   void InjectCoverageAtBlock(Function &F, BasicBlock &BB, size_t Idx,
                              bool IsLeafFunc = true);
+  void InjectSpecificationAtBlock(Function &F, BasicBlock &BB);
   Function *CreateInitCallsForSections(Module &M, const char *CtorName,
                                        const char *InitFunctionName, Type *Ty,
                                        const char *Section);
@@ -197,8 +198,12 @@ class ModuleSanitizerCoverageAFL
 
   uint32_t        instr = 0, selects = 0, unhandled = 0;
   GlobalVariable *AFLMapPtr = NULL;
+  GlobalVariable *AFLApiSpec = NULL;
   ConstantInt    *One = NULL;
   ConstantInt    *Zero = NULL;
+
+  // 需要插桩的函数, 从文件中读取
+  std::set<std::string> functionNames;
 
 };
 
@@ -372,6 +377,12 @@ bool ModuleSanitizerCoverageAFL::instrumentModule(
   One = ConstantInt::get(IntegerType::getInt8Ty(Ctx), 1);
   Zero = ConstantInt::get(IntegerType::getInt8Ty(Ctx), 0);
 
+  // 这个变量是用来记录interesting basic block 的数量，interesting basic block 是指 这个basic block中包含这样的指令，
+  // (1). 指令的操作数是大于或者等于两个参数（或者间接参数，也就是操作数的操作数...是函数参数）
+  // (2). 指令的操作数是参数（或者间接参数，如(1)），且该指令的左值是返回值
+  AFLApiSpec = new GlobalVariable(M, PointerType::get(Int32Ty, 0), false, 
+                        GlobalValue::ExternalLinkage, 0, "__afl_api_spec");
+
   // Make sure smaller parameters are zero-extended to i64 if required by the
   // target ABI.
   AttributeList SanCovTraceCmpZeroExtAL;
@@ -421,6 +432,15 @@ bool ModuleSanitizerCoverageAFL::instrumentModule(
   SanCovTracePC = M.getOrInsertFunction(SanCovTracePCName, VoidTy);
   SanCovTracePCGuard =
       M.getOrInsertFunction(SanCovTracePCGuardName, VoidTy, Int32PtrTy);
+
+  // functionNames = loadFunctionNamesFromFile("functions.txt");
+  std::ifstream file("functions.txt");
+  std::string line;
+
+  while (std::getline(file, line)) {
+    printf("===================== %s\n", line.c_str());
+    functionNames.insert(line);
+  }
 
   for (auto &F : M)
     instrumentFunction(F, DTCallback, PDTCallback);
@@ -519,6 +539,122 @@ static bool shouldInstrumentBlock(const Function &F, const BasicBlock *BB,
   return !isFullDominator(BB, DT) &&
          !(isFullPostDominator(BB, PDT) && !BB->getSinglePredecessor());
 
+}
+
+// 从文件中读取函数名并存储在集合中
+std::set<std::string> loadFunctionNamesFromFile(const std::string &filename) 
+{
+  std::set<std::string> functionNames;
+  std::ifstream file(filename);
+  std::string line;
+
+  while (std::getline(file, line)) {
+    functionNames.insert(line);
+  }
+
+  return functionNames;
+}
+
+// 递归检查一个指令的结果是否作为返回值
+bool isResultUsedAsReturnValue(const Instruction &I) 
+{
+  // 本身就是return指令
+  if (const ReturnInst *RI = dyn_cast<ReturnInst>(&I)) 
+    return true;
+  // 创建一个集合来跟踪已经检查过的指令，防止循环依赖
+  std::set<const Instruction *> checkedInstructions;
+  
+  // 创建一个栈，用于递归处理用户的用户
+  std::stack<const Instruction *> toCheck;
+  toCheck.push(&I);
+
+  while (!toCheck.empty()) 
+  {
+    const Instruction *instr = toCheck.top();
+    toCheck.pop();
+
+    if (checkedInstructions.count(instr)) 
+    {
+      // 防止循环依赖
+      continue;
+    }
+
+    checkedInstructions.insert(instr);
+
+    for (const User *U : instr->users()) 
+    {
+      if (const ReturnInst *RI = dyn_cast<ReturnInst>(U)) 
+      {
+        return true;
+      } 
+      else if (const Instruction *userInstr = dyn_cast<Instruction>(U)) 
+      {
+        // 如果用户也是指令，将其添加到递归栈中
+        toCheck.push(userInstr);
+      }
+    }
+  }
+  return false;
+}
+
+// 递归检查一个值是否是参数或者间接是参数
+bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues) 
+{
+
+  if (checkedValues.count(V)) 
+  {
+    return false; // 防止循环依赖
+  }
+
+  checkedValues.insert(V);
+
+  if (isa<Argument>(V)) 
+  {
+    return true; // 如果是参数，返回 true
+  }
+
+  if (Instruction *I = dyn_cast<Instruction>(V)) 
+  {
+    for (int opIdx = 0; opIdx < I->getNumOperands(); ++opIdx) 
+    {
+      Value *operand = I->getOperand(opIdx);
+      if (isArgumentOrIndirectArgument(operand, checkedValues)) 
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool shouldSpecInstrumentBlock(const Function &F, const BasicBlock *BB) 
+{
+  for (const Instruction &I : *BB)
+  {
+    int numOperands = I.getNumOperands();
+    int paramOperandsCount = 0;
+
+    std::set<Value *> checkedValues; // 用于跟踪已经检查过的值
+
+    // 检查每个操作数是否是参数
+    for (int opIdx = 0; opIdx < numOperands; ++opIdx) 
+    {
+      Value *operand = I.getOperand(opIdx);
+      // if (isa<Argument>(operand)) 
+      if (isArgumentOrIndirectArgument(operand, checkedValues))
+      {
+        // 如果操作数是参数，增加计数
+        paramOperandsCount++;
+      }
+    }
+
+    // 如果有至少一条指令的大于等于 2 个操作数都是参数，或者其中的一条指令的至少一个操作数是参数
+    if (paramOperandsCount >= 2 || (paramOperandsCount >= 1 && isResultUsedAsReturnValue(I))) 
+    {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Returns true iff From->To is a backedge.
@@ -1040,7 +1176,17 @@ bool ModuleSanitizerCoverageAFL::InjectCoverage(
 
   if (!AllBlocks.empty())
     for (size_t i = 0, N = AllBlocks.size(); i < N; i++)
+    {
+      // printf("\n***************************** Allblocks size: %d\n", AllBlocks.size());
       InjectCoverageAtBlock(F, *AllBlocks[i], i, IsLeafFunc);
+      if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, AllBlocks[i]))
+      {
+        printf("---------------------  符合条件的基本块！！！\n");
+        AllBlocks[i]->print(llvm::outs());
+        printf("---------------------  符合条件的基本块！！！\n");
+        InjectSpecificationAtBlock(F, *AllBlocks[i]);
+      }
+    }
 
   return true;
 
@@ -1244,6 +1390,28 @@ void ModuleSanitizerCoverageAFL::InjectCoverageAtBlock(Function   &F,
     ++instr;
 
   }
+
+}
+
+void ModuleSanitizerCoverageAFL::InjectSpecificationAtBlock(Function &F, BasicBlock &BB)
+{
+  BasicBlock::iterator IP = BB.getFirstInsertionPt();
+  IRBuilder<> IRB(&*IP);
+  // 创建一个Load指令，用于加载全局变量的的指针
+  LoadInst *LoadAFLApiSpecPtr = IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLApiSpec);
+  SetNoSanitizeMetadata(LoadAFLApiSpecPtr);
+
+  // 创建一个Load指令，用于加载全局变量的的值
+  LoadInst *LoadAFLApiSpec = IRB.CreateLoad(IRB.getInt32Ty(), LoadAFLApiSpecPtr);
+  SetNoSanitizeMetadata(LoadAFLApiSpec);
+
+  // 创建一个Add指令，将AFLApiSpec加1
+  Value *NewValue = IRB.CreateAdd(LoadAFLApiSpec, ConstantInt::get(IntegerType::getInt32Ty(F.getContext()), 1));
+  // SetNoSanitizeMetadata(NewValue);
+
+  // 创建一个Store指令，将新值存回全局变量
+  StoreInst *StoreAFLApiSpec = IRB.CreateStore(NewValue, LoadAFLApiSpecPtr);
+  SetNoSanitizeMetadata(StoreAFLApiSpec);
 
 }
 

@@ -387,6 +387,10 @@
 
 #define SHM_ENV_VAR "__AFL_SHM_ID"
 
+/* Environment variable used to pass SHM SPEC ID to the called program. */
+
+#define SHM_SPEC_VAR "__AFL_SHM_SPEC_ID"
+
 /* Environment variable used to pass SHM FUZZ ID to the called program. */
 
 #define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
@@ -441,6 +445,8 @@
    (adjusting AFL_INST_RATIO when compiling is probably a better way to solve
    problems with complex programs). You need to recompile the target binary
    after changing this - otherwise, SEGVs may ensue. */
+
+#define API_SPEC_SIZE 4
 
 #define MAP_SIZE_POW2 16
 

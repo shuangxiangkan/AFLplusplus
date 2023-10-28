@@ -813,6 +813,8 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 
   if (compiler_mode == LLVM || compiler_mode == LTO) {
 
+    printf("\nedit_params   ------------------------ compiler_mode == LLVM");
+
     cc_params[cc_par_cnt++] = "-Wno-unused-command-line-argument";
 
     if (lto_mode && have_instr_env) {
@@ -1021,7 +1023,7 @@ static void edit_params(u32 argc, char **argv, char **envp) {
           instrument_mode = INSTRUMENT_LLVMNATIVE;
 
         } else {
-
+          printf("\n----------------------------- SanitizerCoveragePCGUARD.so");
     #if LLVM_MAJOR >= 13                            /* use new pass manager */
       #if LLVM_MAJOR < 16
           cc_params[cc_par_cnt++] = "-fexperimental-new-pass-manager";
@@ -1504,6 +1506,8 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 
 int main(int argc, char **argv, char **envp) {
 
+  printf("*************************\n");
+
   int   i;
   char *callname = argv[0], *ptr = NULL;
 
@@ -1574,6 +1578,7 @@ int main(int argc, char **argv, char **envp) {
 #if (LLVM_MAJOR >= 3)
 
   if (strncmp(callname, "afl-clang-fast", 14) == 0) {
+    printf(" ----------------------------- compiler_mode = LLVM");
 
     compiler_mode = LLVM;
 
@@ -2419,6 +2424,7 @@ int main(int argc, char **argv, char **envp) {
 
   #endif
       instrument_mode = INSTRUMENT_PCGUARD;
+      printf("\n-----------------------------3 instrument_mode = INSTRUMENT_PCGUARD");
 
 #else
     instrument_mode = INSTRUMENT_AFL;
@@ -2554,6 +2560,12 @@ int main(int argc, char **argv, char **envp) {
     fflush(stdout);
     fflush(stderr);
 
+  }
+
+  printf("\n");
+  for (i = 0; i < (s32)cc_par_cnt; i++)
+  {
+    printf("----- cc_parms[%d] = %s\n", i, cc_params[i]);
   }
 
   if (passthrough) {

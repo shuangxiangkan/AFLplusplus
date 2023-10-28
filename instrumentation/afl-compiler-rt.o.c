@@ -103,8 +103,12 @@ static u32 __afl_fuzz_len_dummy;
 u32       *__afl_fuzz_len = &__afl_fuzz_len_dummy;
 int        __afl_sharedmem_fuzzing __attribute__((weak));
 
+static u32 __afl_api_spec_initial;
+u32        *__afl_api_spec = &__afl_api_spec_initial; // Record the number of interesting blocks
+
 u32 __afl_final_loc;
 u32 __afl_map_size = MAP_SIZE;
+u32 __afl_spec_size = API_SPEC_SIZE;
 u32 __afl_dictionary_len;
 u64 __afl_map_addr;
 u32 __afl_first_final_loc;
@@ -314,6 +318,40 @@ static void __afl_map_shm_fuzz() {
     fprintf(stderr, "Error: variable for fuzzing shared memory is not set\n");
     send_forkserver_error(FS_ERROR_SHM_OPEN);
     exit(1);
+
+  }
+
+}
+
+/* SHM SPEC setup. */
+
+static void __afl_spec_shm(void) {
+
+
+  printf("------------------------------------------ 执行 __afl_spec_shm\n");
+
+  u8 *id_str = getenv(SHM_SPEC_VAR);
+
+  /* If we're running under AFL, attach to the appropriate region, replacing the
+     early-stage __afl_area_initial region that is needed to allow some really
+     hacky .init code to work correctly in projects such as OpenSSL. */
+
+  if (id_str) {
+
+    u32 shm_id = atoi(id_str);
+
+    printf("-------------------------------- id_str");
+
+    __afl_api_spec = shmat(shm_id, NULL, 0);
+
+    /* Whooooops. */
+
+    if (__afl_api_spec == (void *)-1) _exit(1);
+
+    /* Write something into the bitmap so that even with low AFL_INST_RATIO,
+       our parent doesn't give up on us. */
+
+    __afl_api_spec[0] = 0;
 
   }
 
@@ -1349,6 +1387,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     cycle_cnt = max_cnt;
     first_pass = 0;
     __afl_selective_coverage_temp = 1;
+    *__afl_api_spec = 0;
 
     return 1;
 
@@ -1359,6 +1398,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     __afl_area_ptr[0] = 1;
     memset(__afl_prev_loc, 0, NGRAM_SIZE_MAX * sizeof(PREV_LOC_T));
     __afl_selective_coverage_temp = 1;
+    *__afl_api_spec = 0;
 
     return 1;
 
@@ -1369,6 +1409,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
         dummy output region. */
 
     __afl_area_ptr = __afl_area_ptr_dummy;
+    __afl_api_spec = &__afl_api_spec_initial;
 
     return 0;
 
@@ -1413,6 +1454,8 @@ void __afl_manual_init(void) {
 
 __attribute__((constructor())) void __afl_auto_init(void) {
 
+  printf("\n----------------------------------- __afl_auto_init\n");
+
   if (__afl_already_initialized_init) { return; }
 
 #ifdef __ANDROID__
@@ -1433,7 +1476,11 @@ __attribute__((constructor())) void __afl_auto_init(void) {
 
   if (getenv(DEFER_ENV_VAR)) return;
 
+  printf(" -------- before __afl_manual_init----------------");
+
   __afl_manual_init();
+
+  printf("\n----------------------------------- __afl_auto_init\n");
 
 }
 
@@ -1441,13 +1488,19 @@ __attribute__((constructor())) void __afl_auto_init(void) {
 
 __attribute__((constructor(EARLY_FS_PRIO))) void __early_forkserver(void) {
 
+  printf("\n----------------------------------- __early_forkserver\n");
+
   if (getenv("AFL_EARLY_FORKSERVER")) { __afl_auto_init(); }
+
+  printf("\n----------------------------------- __early_forkserver\n");
 
 }
 
 /* Initialization of the shmem - earliest possible because of LTO fixed mem. */
 
 __attribute__((constructor(CTOR_PRIO))) void __afl_auto_early(void) {
+
+  printf("\n----------------------------------- __afl_auto_early\n");
 
   if (__afl_already_initialized_early) return;
   __afl_already_initialized_early = 1;
@@ -1457,12 +1510,17 @@ __attribute__((constructor(CTOR_PRIO))) void __afl_auto_early(void) {
   if (getenv("AFL_DISABLE_LLVM_INSTRUMENTATION")) return;
 
   __afl_map_shm();
+  __afl_spec_shm();
+
+  printf("\n----------------------------------- __afl_auto_early\n");
 
 }
 
 /* preset __afl_area_ptr #2 */
 
 __attribute__((constructor(1))) void __afl_auto_second(void) {
+
+  printf("\n----------------------------------- __afl_auto_second\n");
 
   if (__afl_already_initialized_second) return;
   __afl_already_initialized_second = 1;
@@ -1501,12 +1559,16 @@ __attribute__((constructor(1))) void __afl_auto_second(void) {
 
   }
 
+  printf("\n----------------------------------- __afl_auto_second\n");
+
 }  // ptr memleak report is a false positive
 
 /* preset __afl_area_ptr #1 - at constructor level 0 global variables have
    not been set */
 
 __attribute__((constructor(0))) void __afl_auto_first(void) {
+
+  printf("\n----------------------------------- __afl_auto_first\n");
 
   if (__afl_already_initialized_first) return;
   __afl_already_initialized_first = 1;
@@ -1524,6 +1586,8 @@ __attribute__((constructor(0))) void __afl_auto_first(void) {
     }
 
   */
+
+  printf("\n----------------------------------- __afl_auto_first\n");
 
 }  // ptr memleak report is a false positive
 
@@ -1889,6 +1953,7 @@ void __sanitizer_cov_trace_pc_guard_init(uint32_t *start, uint32_t *stop) {
 
       __afl_unmap_shm();
       __afl_map_shm();
+      __afl_spec_shm();
 
     }
 
