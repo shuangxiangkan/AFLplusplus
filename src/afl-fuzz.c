@@ -2187,9 +2187,6 @@ int main(int argc, char **argv_orig, char **envp) {
       afl_shm_init(&afl->shm, afl->fsrv.map_size, afl->non_instrumented_mode);
 
   afl->fsrv.spec_num = afl_shm_spec_init(&afl->shm, afl->non_instrumented_mode);
-  
-
-  printf("\n --------------------------1. afl->fsrv.trace_bits \n");
 
   if (!afl->non_instrumented_mode && !afl->fsrv.qemu_mode &&
       !afl->unicorn_mode && !afl->fsrv.frida_mode && !afl->fsrv.cs_mode &&

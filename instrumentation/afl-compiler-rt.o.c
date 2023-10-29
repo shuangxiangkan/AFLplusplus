@@ -323,14 +323,20 @@ static void __afl_map_shm_fuzz() {
 
 }
 
+// __attribute__((destructor)) void __afl_auto_deinit(void) 
+// {
+
+//   printf("\n ------------------------------------------------------------------- after main __afl_api_spec: %d\n", *__afl_api_spec);
+
+// }
+
 /* SHM SPEC setup. */
 
 static void __afl_spec_shm(void) {
 
-
-  printf("------------------------------------------ 执行 __afl_spec_shm\n");
-
   u8 *id_str = getenv(SHM_SPEC_VAR);
+
+  printf("------------------------------------------ id_str:: %s\n", id_str);
 
   /* If we're running under AFL, attach to the appropriate region, replacing the
      early-stage __afl_area_initial region that is needed to allow some really
@@ -338,9 +344,11 @@ static void __afl_spec_shm(void) {
 
   if (id_str) {
 
+    printf("------------------------------------------ id_str:: %s\n", id_str);
+
     u32 shm_id = atoi(id_str);
 
-    printf("-------------------------------- id_str");
+    printf("-------------------------------- id_str !!!:: %s\n", id_str);
 
     __afl_api_spec = shmat(shm_id, NULL, 0);
 
@@ -1380,6 +1388,8 @@ int __afl_persistent_loop(unsigned int max_cnt) {
        iteration, it's our job to erase any trace of whatever happened
        before the loop. */
 
+    printf("\n: persistent loop: first pass: %d\n", *__afl_api_spec );
+
     memset(__afl_area_ptr, 0, __afl_map_size);
     __afl_area_ptr[0] = 1;
     memset(__afl_prev_loc, 0, NGRAM_SIZE_MAX * sizeof(PREV_LOC_T));
@@ -1392,6 +1402,8 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     return 1;
 
   } else if (--cycle_cnt) {
+
+    printf("\n******************************************************************************8: persistent loop: else if: %d\n", *__afl_api_spec );
 
     raise(SIGSTOP);
 
@@ -1410,6 +1422,9 @@ int __afl_persistent_loop(unsigned int max_cnt) {
 
     __afl_area_ptr = __afl_area_ptr_dummy;
     __afl_api_spec = &__afl_api_spec_initial;
+
+    printf("\n******************************************************************************8: persistent loop: else: %d\n", *__afl_api_spec );
+
 
     return 0;
 
@@ -1454,8 +1469,6 @@ void __afl_manual_init(void) {
 
 __attribute__((constructor())) void __afl_auto_init(void) {
 
-  printf("\n----------------------------------- __afl_auto_init\n");
-
   if (__afl_already_initialized_init) { return; }
 
 #ifdef __ANDROID__
@@ -1476,11 +1489,7 @@ __attribute__((constructor())) void __afl_auto_init(void) {
 
   if (getenv(DEFER_ENV_VAR)) return;
 
-  printf(" -------- before __afl_manual_init----------------");
-
   __afl_manual_init();
-
-  printf("\n----------------------------------- __afl_auto_init\n");
 
 }
 
@@ -1488,11 +1497,7 @@ __attribute__((constructor())) void __afl_auto_init(void) {
 
 __attribute__((constructor(EARLY_FS_PRIO))) void __early_forkserver(void) {
 
-  printf("\n----------------------------------- __early_forkserver\n");
-
   if (getenv("AFL_EARLY_FORKSERVER")) { __afl_auto_init(); }
-
-  printf("\n----------------------------------- __early_forkserver\n");
 
 }
 
@@ -1500,7 +1505,6 @@ __attribute__((constructor(EARLY_FS_PRIO))) void __early_forkserver(void) {
 
 __attribute__((constructor(CTOR_PRIO))) void __afl_auto_early(void) {
 
-  printf("\n----------------------------------- __afl_auto_early\n");
 
   if (__afl_already_initialized_early) return;
   __afl_already_initialized_early = 1;
@@ -1512,15 +1516,11 @@ __attribute__((constructor(CTOR_PRIO))) void __afl_auto_early(void) {
   __afl_map_shm();
   __afl_spec_shm();
 
-  printf("\n----------------------------------- __afl_auto_early\n");
-
 }
 
 /* preset __afl_area_ptr #2 */
 
 __attribute__((constructor(1))) void __afl_auto_second(void) {
-
-  printf("\n----------------------------------- __afl_auto_second\n");
 
   if (__afl_already_initialized_second) return;
   __afl_already_initialized_second = 1;
@@ -1559,16 +1559,12 @@ __attribute__((constructor(1))) void __afl_auto_second(void) {
 
   }
 
-  printf("\n----------------------------------- __afl_auto_second\n");
-
 }  // ptr memleak report is a false positive
 
 /* preset __afl_area_ptr #1 - at constructor level 0 global variables have
    not been set */
 
 __attribute__((constructor(0))) void __afl_auto_first(void) {
-
-  printf("\n----------------------------------- __afl_auto_first\n");
 
   if (__afl_already_initialized_first) return;
   __afl_already_initialized_first = 1;
@@ -1586,8 +1582,6 @@ __attribute__((constructor(0))) void __afl_auto_first(void) {
     }
 
   */
-
-  printf("\n----------------------------------- __afl_auto_first\n");
 
 }  // ptr memleak report is a false positive
 
@@ -1953,7 +1947,7 @@ void __sanitizer_cov_trace_pc_guard_init(uint32_t *start, uint32_t *stop) {
 
       __afl_unmap_shm();
       __afl_map_shm();
-      __afl_spec_shm();
+      // __afl_spec_shm();
 
     }
 

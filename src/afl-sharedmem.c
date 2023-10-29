@@ -303,6 +303,8 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
 
     shm_str = alloc_printf("%d", shm->shm_id);
 
+    printf("shm_str: %s\n", shm_str);
+
     /* If somebody is asking us to fuzz instrumented binaries in
        non-instrumented mode, we don't want them to detect instrumentation,
        since we won't be sending fork server commands. This should be replaced
@@ -380,7 +382,18 @@ u32 *afl_shm_spec_init(sharedmem_t *shm, unsigned char non_instrumented_mode) {
   if (!non_instrumented_mode) {
 
     shm_spec_str = alloc_printf("%d", shm->shm_spec_id);
-    setenv(SHM_SPEC_VAR, shm_spec_str, 1);
+    printf("shm_spec_str: %s\n", shm_spec_str);
+    int env = setenv(SHM_SPEC_VAR, shm_spec_str, 1);
+    if (env == NULL) {
+      printf("setenv failed\n");
+    }
+    char* env2 = getenv(SHM_SPEC_VAR);
+    if (env2 == NULL) {
+      printf("getenv failed\n");
+    }
+    else {
+      printf("env2: %s\n", env2);
+    }
     ck_free(shm_spec_str);//
 
   }

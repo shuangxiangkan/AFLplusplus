@@ -29,3 +29,9 @@ m 262148 0x00000000 --rw------- shuangxiangkan    staff
 
 删除共享内存即可：ipcrm -m ID
 比如：ipcrm -m 262148
+
+
+
+
+编程时出现的问题：
+1. 默认的插桩afl-clang-fast, 会对所有的函数inline, 如果是对单个函数体插桩，可能在inline之后就没有插桩的部分了

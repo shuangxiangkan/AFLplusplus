@@ -42,15 +42,19 @@ define i32 @add(i32 noundef %0, i32 noundef %1) local_unnamed_addr #0 comdat !db
 
 ; Function Attrs: mustprogress nofree norecurse nosync nounwind readnone uwtable willreturn
 define i32 @main(i32 noundef %0, i8** nocapture noundef readnone %1) local_unnamed_addr #0 comdat !dbg !21 {
-  %3 = load i32, i32* getelementptr inbounds ([1 x i32], [1 x i32]* @__sancov_gen_.1, i32 0, i32 0), align 4, !dbg !33, !nosanitize !17
-  %4 = load i8*, i8** @__afl_area_ptr, align 8, !dbg !33, !nosanitize !17
-  %5 = getelementptr i8, i8* %4, i32 %3, !dbg !33
-  %6 = load i8, i8* %5, align 1, !dbg !33, !nosanitize !17
-  %7 = add i8 %6, 1, !dbg !33
-  %8 = icmp eq i8 %7, 0, !dbg !33
-  %9 = zext i1 %8 to i8, !dbg !33
-  %10 = add i8 %7, %9, !dbg !33
-  store i8 %10, i8* %5, align 1, !dbg !33, !nosanitize !17
+  %3 = load i32*, i32** @__afl_api_spec, align 8, !dbg !33, !nosanitize !17
+  %4 = load i32, i32* %3, align 4, !dbg !33, !nosanitize !17
+  %5 = add i32 %4, 1, !dbg !33
+  store i32 %5, i32* %3, align 4, !dbg !33, !nosanitize !17
+  %6 = load i32, i32* getelementptr inbounds ([1 x i32], [1 x i32]* @__sancov_gen_.1, i32 0, i32 0), align 4, !dbg !33, !nosanitize !17
+  %7 = load i8*, i8** @__afl_area_ptr, align 8, !dbg !33, !nosanitize !17
+  %8 = getelementptr i8, i8* %7, i32 %6, !dbg !33
+  %9 = load i8, i8* %8, align 1, !dbg !33, !nosanitize !17
+  %10 = add i8 %9, 1, !dbg !33
+  %11 = icmp eq i8 %10, 0, !dbg !33
+  %12 = zext i1 %11 to i8, !dbg !33
+  %13 = add i8 %10, %12, !dbg !33
+  store i8 %13, i8* %8, align 1, !dbg !33, !nosanitize !17
   call void @llvm.dbg.value(metadata i32 %0, metadata !28, metadata !DIExpression()), !dbg !34
   call void @llvm.dbg.value(metadata i8** %1, metadata !29, metadata !DIExpression()), !dbg !34
   call void @llvm.dbg.value(metadata i32 1, metadata !30, metadata !DIExpression()), !dbg !34

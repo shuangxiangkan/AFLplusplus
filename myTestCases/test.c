@@ -1,8 +1,14 @@
 #include <stdio.h>
+
+int add(int a, int b)
+{
+    return a + b;
+}
+
 int main(int argc, char *argv[])
 {
-    char buf[100] = {0};
-    gets(buf);   //存在栈溢出漏洞
-    printf(buf); //存在格式化字符串漏洞
+    int a = 1;
+    int b = 2;
+    int c = add(a, b);
     return 0;
 }
