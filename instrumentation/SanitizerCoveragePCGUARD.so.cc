@@ -600,18 +600,27 @@ bool isResultUsedAsReturnValue(const Instruction &I)
 // 递归检查一个值是否是参数或者间接是参数
 bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues) 
 {
-
+  // printf("\n");
+  // V->print(llvm::outs());
+  // printf("\n");
   if (checkedValues.count(V)) 
   {
     return false; // 防止循环依赖
   }
 
-  checkedValues.insert(V);
+  // checkedValues.insert(V);
 
-  if (isa<Argument>(V)) 
+  if (isa<Argument>(V) && !checkedValues.count(V)) 
+  // if (isa<Argument>(V)) 
   {
+    printf("\n--------------------------- Argument ---------------------------\n");
+    V->print(llvm::outs());
+    printf("\n--------------------------- Argument ---------------------------\n");
+    checkedValues.insert(V);
     return true; // 如果是参数，返回 true
   }
+
+  checkedValues.insert(V);
 
   if (Instruction *I = dyn_cast<Instruction>(V)) 
   {
@@ -624,6 +633,27 @@ bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues)
       }
     }
   }
+
+  for (User *U : V->users()) {
+    if (Instruction *I = dyn_cast<Instruction>(U)) {
+      // if (isArgumentOrIndirectArgument(I, checkedValues)) {
+      //   return true;
+      // }
+      // printf("\n---user---\n");
+      // I->print(llvm::outs());
+      // printf("\n---user---\n");
+      for (int opIdx = 0; opIdx < I->getNumOperands(); ++opIdx) 
+      {
+        Value *operand = I->getOperand(opIdx);
+        if (isArgumentOrIndirectArgument(operand, checkedValues)) 
+        {
+          return true;
+        }
+      }
+    }
+  }
+
+  
   return false;
 }
 
@@ -631,27 +661,60 @@ static bool shouldSpecInstrumentBlock(const Function &F, const BasicBlock *BB)
 {
   for (const Instruction &I : *BB)
   {
-    int numOperands = I.getNumOperands();
+    // printf("\n--------------------------- Instruction ---------------------------\n");
+    // I.print(llvm::outs());
+    // printf("\n--------------------------- Instruction ---------------------------\n");
     int paramOperandsCount = 0;
 
     std::set<Value *> checkedValues; // 用于跟踪已经检查过的值
 
     // 检查每个操作数是否是参数
-    for (int opIdx = 0; opIdx < numOperands; ++opIdx) 
+    for (int opIdx = 0; opIdx < I.getNumOperands(); ++opIdx) 
     {
       Value *operand = I.getOperand(opIdx);
       // if (isa<Argument>(operand)) 
       if (isArgumentOrIndirectArgument(operand, checkedValues))
       {
+        printf("\n--------------------------- operand ---------------------------\n");
+        Value *operand = I.getOperand(opIdx);
+        operand->print(llvm::outs());
+        printf("\n--------------------------- operand ---------------------------\n");
+        // operand->print(llvm::outs());
         // 如果操作数是参数，增加计数
         paramOperandsCount++;
+        printf("\nparamOperandsCount: %d\n", paramOperandsCount);
       }
     }
 
     // 如果有至少一条指令的大于等于 2 个操作数都是参数，或者其中的一条指令的至少一个操作数是参数
-    if (paramOperandsCount >= 2 || (paramOperandsCount >= 1 && isResultUsedAsReturnValue(I))) 
+    // if (paramOperandsCount >= 2 || (paramOperandsCount >= 1 && isResultUsedAsReturnValue(I))) 
+    // {
+    //   return true;
+    // }
+
+    if (paramOperandsCount >= 2)
     {
+      printf("\n---------------------------------------------------- paramOperandsCount >= 2\n");
+      I.print(llvm::outs());
+      printf("\n---------------------------------------------------- paramOperandsCount >= 2\n");
+      for (int opIdx = 0; opIdx < I.getNumOperands(); ++opIdx) 
+      {
+        Value *operand = I.getOperand(opIdx);
+        printf("\n--------------------------- operand ---------------------------\n");
+        operand->print(llvm::outs());
+        printf("\n--------------------------- operand ---------------------------\n");
+      }
       return true;
+    }
+    else if (paramOperandsCount == 1)
+    {
+      // printf("\n");
+      // I.print(llvm::outs());
+      // printf("\n");
+      if (const ReturnInst *retInst = dyn_cast<ReturnInst>(&I))
+      {
+        return true;
+      }
     }
   }
   return false;
@@ -927,6 +990,14 @@ bool ModuleSanitizerCoverageAFL::InjectCoverage(
 
   for (auto &BB : F) {
 
+    if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, &BB))
+    {
+      printf("---------------------  符合条件的基本块！！！\n");
+      BB.print(llvm::outs());
+      printf("---------------------  符合条件的基本块！！！\n");
+      InjectSpecificationAtBlock(F, BB);
+    }
+
     for (auto &IN : BB) {
 
       CallInst *callInst = nullptr;
@@ -1179,13 +1250,13 @@ bool ModuleSanitizerCoverageAFL::InjectCoverage(
     {
       // printf("\n***************************** Allblocks size: %d\n", AllBlocks.size());
       InjectCoverageAtBlock(F, *AllBlocks[i], i, IsLeafFunc);
-      if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, AllBlocks[i]))
-      {
-        printf("---------------------  符合条件的基本块！！！\n");
-        AllBlocks[i]->print(llvm::outs());
-        printf("---------------------  符合条件的基本块！！！\n");
-        InjectSpecificationAtBlock(F, *AllBlocks[i]);
-      }
+      // if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, AllBlocks[i]))
+      // {
+      //   printf("---------------------  符合条件的基本块！！！\n");
+      //   AllBlocks[i]->print(llvm::outs());
+      //   printf("---------------------  符合条件的基本块！！！\n");
+      //   InjectSpecificationAtBlock(F, *AllBlocks[i]);
+      // }
     }
 
   return true;

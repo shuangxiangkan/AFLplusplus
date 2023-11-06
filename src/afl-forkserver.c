@@ -520,6 +520,8 @@ static void report_error_and_exit(int error) {
    cloning a stopped child. So, we just execute once, and then send commands
    through a pipe. The other part of this logic is in afl-as.h / llvm_mode */
 
+
+// init_forkserver()
 void afl_fsrv_start(afl_forkserver_t *fsrv, char **argv,
                     volatile u8 *stop_soon_p, u8 debug_child_output) {
 
@@ -830,6 +832,7 @@ void afl_fsrv_start(afl_forkserver_t *fsrv, char **argv,
   if (pipe(st_pipe) || pipe(ctl_pipe)) { PFATAL("pipe() failed"); }
 
   fsrv->last_run_timed_out = 0;
+  // fork() the child process
   fsrv->fsrv_pid = fork();
 
   if (fsrv->fsrv_pid < 0) { PFATAL("fork() failed"); }
@@ -891,7 +894,8 @@ void afl_fsrv_start(afl_forkserver_t *fsrv, char **argv,
        specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
 
     setsid();
-
+ 
+    // control if the output of target
     if (!(debug_child_output)) {
 
       dup2(fsrv->dev_null_fd, 1);
@@ -939,6 +943,8 @@ void afl_fsrv_start(afl_forkserver_t *fsrv, char **argv,
     /* Set sane defaults for sanitizers */
     set_sanitizer_defaults();
 
+    // execv()
+    printf("--------------------------------------execv: %s\n", fsrv->target_path);
     fsrv->init_child_func(fsrv, argv);
 
     /* Use a distinctive bitmap signature to tell the parent about execv()
@@ -1578,6 +1584,8 @@ afl_fsrv_write_to_testcase(afl_forkserver_t *fsrv, u8 *buf, size_t len) {
 /* Execute target application, monitoring for timeouts. Return status
    information. The called program will update afl->fsrv->trace_bits. */
 
+
+// run_target() in AFL
 fsrv_run_result_t __attribute__((hot))
 afl_fsrv_run_target(afl_forkserver_t *fsrv, u32 timeout,
                     volatile u8 *stop_soon_p) {
@@ -1663,6 +1671,7 @@ afl_fsrv_run_target(afl_forkserver_t *fsrv, u32 timeout,
   /* we have the fork server (or faux server) up and running
   First, tell it if the previous run timed out. */
 
+  // Inform the target process to continue to run
   if ((res = write(fsrv->fsrv_ctl_fd, &write_value, 4)) != 4) {
 
     if (*stop_soon_p) { return 0; }

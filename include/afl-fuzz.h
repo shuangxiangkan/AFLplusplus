@@ -203,6 +203,8 @@ struct queue_entry {
 
   struct queue_entry *mother;           /* queue entry this based on        */
 
+  u32 spec_num;
+  u32 spec_loop_count;
 };
 
 struct extra_data {

@@ -450,6 +450,8 @@
 
 #define MAP_SIZE_POW2 16
 
+#define SPEC_MAX_LOOP 10000
+
 /* Do not change this unless you really know what you are doing. */
 
 #define MAP_SIZE (1U << MAP_SIZE_POW2)

@@ -35,3 +35,11 @@ m 262148 0x00000000 --rw------- shuangxiangkan    staff
 
 编程时出现的问题：
 1. 默认的插桩afl-clang-fast, 会对所有的函数inline, 如果是对单个函数体插桩，可能在inline之后就没有插桩的部分了
+2. persistent mode, no bug the loop will continue, otherwise, the loop is break;
+3. When use __AFL_LOOP(1000), 标准输入stdin应该放在AFL_LOOP()里面, 
+   read()是直接从文件将数据读取到用户缓冲区，而fgets()是先从文件将数据读取到标准输入缓冲器，然后再读入到用户缓冲区, 
+   而AFL是从标准输入获得input的，而不是从标准输入缓冲区获得输入的. 所以harness应该使用read();
+   !!! AFL的标准输入有空再看一下
+4. #pragma clang optimize off
+     #pragma GCC            optimize("O0")
+   in target.c and why? 

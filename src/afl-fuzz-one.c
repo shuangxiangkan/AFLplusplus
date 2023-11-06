@@ -347,6 +347,7 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
 #else
 
+  printf (" --- afl->custom_mutators_count: %d\n", afl->custom_mutators_count);
   if (unlikely(afl->custom_mutators_count)) {
 
     /* The custom mutator will decide to skip this test case or not. */
@@ -364,7 +365,7 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   }
 
-  if (likely(afl->pending_favored)) {
+  if (likely(afl->pending_favored) && (!afl->queue_cur->spec_num || (afl->queue_cur->spec_num && afl->queue_cur->spec_loop_count == SPEC_MAX_LOOP))) {
 
     /* If we have any favored, non-fuzzed new arrivals in the queue,
        possibly skip to them at the expense of already-fuzzed or non-favored
@@ -379,7 +380,9 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   } else if (!afl->non_instrumented_mode && !afl->queue_cur->favored &&
 
-             afl->queued_items > 10) {
+             afl->queued_items > 10  && 
+             
+             (!afl->queue_cur->spec_num || (afl->queue_cur->spec_num && afl->queue_cur->spec_loop_count == SPEC_MAX_LOOP))) {
 
     /* Otherwise, still possibly skip non-favored cases, albeit less often.
        The odds of skipping stuff are higher for already-fuzzed inputs and
@@ -426,6 +429,14 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   out_buf = afl_realloc(AFL_BUF_PARAM(out), len);
   if (unlikely(!out_buf)) { PFATAL("alloc"); }
+
+  printf(" --- out_buf: %s\n", out_buf);
+  // printf(" --- size of out_buf: %d\n", sizeof(out_buf));
+  // printf(" --- size of *out_buf: %d\n", sizeof(*out_buf));
+  printf(" --- in_buf: %s\n", in_buf);
+  // printf(" --- size of in_buf: %d\n", sizeof(in_buf));
+  printf(" --- len: %d\n", len);
+  // printf(" --- size of char: %d\n", sizeof(char));
 
   afl->subseq_tmouts = 0;
 
@@ -499,7 +510,104 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   }
 
+  printf(" ------ out_buf: %s\n", out_buf);
+  // printf(" ------ in_buf: %s\n", in_buf);
+  // printf(" ------ len: %d\n", len);
   memcpy(out_buf, in_buf, len);
+  printf(" ------ out_buf: %s\n", out_buf);
+  printf(" ------ in_buf: %s\n", in_buf);
+
+  printf(" --- afl->fsrv.spec_num: %d\n", *afl->fsrv.spec_num);
+  printf(" --- afl->queue_cur->was_fuzzed: %d\n", afl->queue_cur->was_fuzzed);
+  printf(" --- afl->queue_cur->spec_num: %d\n", afl->queue_cur->spec_num);
+  printf(" --- afl->queue_cur->spec_loop_count: %d\n", afl->queue_cur->spec_loop_count);
+  if (afl->queue_cur->spec_num && afl->queue_cur->spec_loop_count < SPEC_MAX_LOOP)
+  {
+    afl->stage_short = "spec";
+    afl->stage_max = SPEC_MAX_LOOP;
+    afl->stage_name = "specification";
+
+    for (afl->stage_cur = afl->queue_cur->spec_loop_count; afl->stage_cur < afl->stage_max; ++afl->stage_cur) 
+    {
+      u8* out_buf_copy = (u8*)malloc(len);
+      memcpy(out_buf_copy, out_buf, len);
+
+      // 使用当前时间作为随机数生成器的种子
+      srand(time(NULL));
+
+      // 生成随机的 start1 和 len1
+      int start1 = rand() % len;
+      int len1 = rand() % (len - start1) + 1;
+
+      // 生成随机的 start2 和 len2
+      int start2 = rand() % len;
+      int len2 = rand() % (len - start2) + 1;
+
+      // 打印替换前的数据和需要替换的数据
+      printf("Original: %s\n", out_buf);
+      printf("Start1: %d, Len1: %d\n", start1, len1);
+      printf("Start2: %d, Len2: %d\n", start2, len2);
+
+      // 打印需要替换的数据内容
+      u8* data1 = out_buf + start1;
+      u8* data2 = out_buf + start2;
+      printf("Data to be replaced (start1): %.*s\n", len1, data1);
+      printf("Data to be replaced (start2): %.*s\n", len2, data2);
+
+      // 计算新的长度并扩容 out_buf
+      int new_len = len - len2 + len1;
+      u8* new_buf = (u8*)malloc(new_len);
+
+      // 逐段拼接数据
+      memcpy(new_buf, out_buf, start2); // 复制前半部分
+      memcpy(new_buf + start2, data1, len1); // 复制第一段替换的数据
+      memcpy(new_buf + start2 + len1, out_buf + start2 + len2, len - (start2 + len2)); // 复制剩余部分
+
+      printf("Replaced: %s\n", new_buf); // 打印替换后的数据
+
+      // 释放原有的 out_buf 和更新指针
+      // free(out_buf);
+      // out_buf = new_buf;
+      out_buf = afl_realloc(AFL_BUF_PARAM(out), new_len);
+      memset(out_buf, 0, new_len);
+      memcpy(out_buf, new_buf, new_len);
+
+      // len = new_len;
+
+      // 在程序结束前释放内存
+      free(new_buf);
+
+
+      
+      // 输出结果
+      printf("New out_buf: %s\n", out_buf);
+
+      u32 spec_num_cur = afl->queue_cur->spec_num;
+      printf(" --- afl->stage_cur: %d\n", afl->stage_cur);
+      printf(" --- out_buf: %s\n", out_buf);
+      if (common_fuzz_stuff(afl, out_buf, len)) 
+      { 
+        afl->queue_cur->spec_loop_count = afl->stage_cur;
+        // Restore out_buf
+        out_buf = afl_realloc(AFL_BUF_PARAM(out), len);
+        memcpy(out_buf, out_buf_copy, len);
+        free(out_buf_copy);
+        printf(" --- out_buf: %s\n", out_buf);
+
+        goto abandon_entry; 
+      }
+
+      if (afl->queue_cur->spec_num > spec_num_cur)
+      {
+        afl->queue_cur->spec_loop_count = 0;
+        afl->stage_cur = 0;
+      }
+
+      printf(" --- afl->queue_cur->spec_num: %d\n", afl->queue_cur->spec_num);
+        
+    }
+  }
+  
 
   /*********************
    * PERFORMANCE SCORE *
@@ -511,8 +619,10 @@ u8 fuzz_one_original(afl_state_t *afl) {
     afl->queue_cur->perf_score = orig_perf = perf_score =
         calculate_score(afl, afl->queue_cur);
 
-  if (unlikely(perf_score <= 0 && afl->active_items > 1)) {
-
+  if (unlikely(perf_score <= 0 && afl->active_items > 1)) 
+  {
+    printf(" --- perf_score: %d\n", perf_score);
+    printf(" --- active_items: %d\n", afl->active_items);
     goto abandon_entry;
 
   }
@@ -726,7 +836,9 @@ u8 fuzz_one_original(afl_state_t *afl) {
     afl->stage_cur_byte = afl->stage_cur >> 3;
 
     FLIP_BIT(out_buf, afl->stage_cur);
+    printf(" --- out_buf: %s\n", out_buf);
     FLIP_BIT(out_buf, afl->stage_cur + 1);
+    printf(" --- out_buf: %s\n", out_buf);
 
 #ifdef INTROSPECTION
     snprintf(afl->mutation, sizeof(afl->mutation), "%s FLIP_BIT2-%u",
@@ -736,7 +848,9 @@ u8 fuzz_one_original(afl_state_t *afl) {
     if (common_fuzz_stuff(afl, out_buf, len)) { goto abandon_entry; }
 
     FLIP_BIT(out_buf, afl->stage_cur);
+    printf(" --- out_buf: %s\n", out_buf);
     FLIP_BIT(out_buf, afl->stage_cur + 1);
+    printf(" --- out_buf: %s\n", out_buf);
 
   }
 
@@ -2017,7 +2131,8 @@ custom_mutator_stage:
    ****************/
 
 havoc_stage:
-
+ 
+  // 跳过havoc
   if (unlikely(afl->custom_only)) {
 
     /* Force UI update */

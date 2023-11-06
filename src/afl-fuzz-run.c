@@ -508,12 +508,17 @@ u8 calibrate_case(afl_state_t *afl, struct queue_entry *q, u8 *use_mem,
 
     printf("\n -----------------------------------before spec_num: %d\n", *afl->fsrv.spec_num);
 
-
+    printf("use_mem: %s\n", use_mem);
     (void)write_to_testcase(afl, (void **)&use_mem, q->len, 1);
 
     fault = fuzz_run_target(afl, &afl->fsrv, use_tmout);
 
-    printf("\n -----------------------------------after spec_num: %d\n", *afl->fsrv.spec_num);
+    if (*afl->fsrv.spec_num)
+    {
+      q->spec_num = *afl->fsrv.spec_num;
+    }
+
+    printf("\n -----------------------------------after spec_num: %d\n", q->spec_num);
 
 
     /* afl->stop_soon is set by the handler for Ctrl+C. When it's pressed,

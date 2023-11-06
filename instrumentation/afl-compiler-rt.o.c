@@ -1388,7 +1388,8 @@ int __afl_persistent_loop(unsigned int max_cnt) {
        iteration, it's our job to erase any trace of whatever happened
        before the loop. */
 
-    printf("\n: persistent loop: first pass: %d\n", *__afl_api_spec );
+    printf("\n*****************************************************************************: persistent loop: first pass cycle_cnt: %d\n", cycle_cnt);
+    printf("\n*****************************************************************************: persistent loop: first pass: %d\n", *__afl_api_spec );
 
     memset(__afl_area_ptr, 0, __afl_map_size);
     __afl_area_ptr[0] = 1;
@@ -1403,14 +1404,18 @@ int __afl_persistent_loop(unsigned int max_cnt) {
 
   } else if (--cycle_cnt) {
 
-    printf("\n******************************************************************************8: persistent loop: else if: %d\n", *__afl_api_spec );
-
     raise(SIGSTOP);
+
+    printf("\n*****************************************************************************: persistent loop: else if: cycle_cnt: %d\n", cycle_cnt);
+    printf("\n******************************************************************************: persistent loop: else if: %d\n", *__afl_api_spec );
 
     __afl_area_ptr[0] = 1;
     memset(__afl_prev_loc, 0, NGRAM_SIZE_MAX * sizeof(PREV_LOC_T));
     __afl_selective_coverage_temp = 1;
     *__afl_api_spec = 0;
+
+    printf("\n******************************************************************************: persistent loop: else if first_pass: %d\n", first_pass);
+
 
     return 1;
 
@@ -1423,7 +1428,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     __afl_area_ptr = __afl_area_ptr_dummy;
     __afl_api_spec = &__afl_api_spec_initial;
 
-    printf("\n******************************************************************************8: persistent loop: else: %d\n", *__afl_api_spec );
+    printf("\n******************************************************************************: persistent loop: else: %d\n", *__afl_api_spec );
 
 
     return 0;
