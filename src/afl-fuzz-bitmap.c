@@ -505,7 +505,7 @@ save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault) {
 
     }
 
-    if (likely(!new_bits)) {
+    if (likely(!new_bits) || afl->custom_mutators_count > 0) {
 
       if (unlikely(afl->crash_mode)) { ++afl->total_crashes; }
       return 0;

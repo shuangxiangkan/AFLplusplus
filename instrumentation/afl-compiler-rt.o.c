@@ -323,12 +323,6 @@ static void __afl_map_shm_fuzz() {
 
 }
 
-// __attribute__((destructor)) void __afl_auto_deinit(void) 
-// {
-
-//   printf("\n ------------------------------------------------------------------- after main __afl_api_spec: %d\n", *__afl_api_spec);
-
-// }
 
 /* SHM SPEC setup. */
 
@@ -336,7 +330,6 @@ static void __afl_spec_shm(void) {
 
   u8 *id_str = getenv(SHM_SPEC_VAR);
 
-  printf("------------------------------------------ id_str:: %s\n", id_str);
 
   /* If we're running under AFL, attach to the appropriate region, replacing the
      early-stage __afl_area_initial region that is needed to allow some really
@@ -344,11 +337,7 @@ static void __afl_spec_shm(void) {
 
   if (id_str) {
 
-    printf("------------------------------------------ id_str:: %s\n", id_str);
-
     u32 shm_id = atoi(id_str);
-
-    printf("-------------------------------- id_str !!!:: %s\n", id_str);
 
     __afl_api_spec = shmat(shm_id, NULL, 0);
 
@@ -1388,8 +1377,6 @@ int __afl_persistent_loop(unsigned int max_cnt) {
        iteration, it's our job to erase any trace of whatever happened
        before the loop. */
 
-    printf("\n*****************************************************************************: persistent loop: first pass cycle_cnt: %d\n", cycle_cnt);
-    printf("\n*****************************************************************************: persistent loop: first pass: %d\n", *__afl_api_spec );
 
     memset(__afl_area_ptr, 0, __afl_map_size);
     __afl_area_ptr[0] = 1;
@@ -1406,15 +1393,11 @@ int __afl_persistent_loop(unsigned int max_cnt) {
 
     raise(SIGSTOP);
 
-    printf("\n*****************************************************************************: persistent loop: else if: cycle_cnt: %d\n", cycle_cnt);
-    printf("\n******************************************************************************: persistent loop: else if: %d\n", *__afl_api_spec );
-
     __afl_area_ptr[0] = 1;
     memset(__afl_prev_loc, 0, NGRAM_SIZE_MAX * sizeof(PREV_LOC_T));
     __afl_selective_coverage_temp = 1;
     *__afl_api_spec = 0;
 
-    printf("\n******************************************************************************: persistent loop: else if first_pass: %d\n", first_pass);
 
 
     return 1;
@@ -1428,7 +1411,6 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     __afl_area_ptr = __afl_area_ptr_dummy;
     __afl_api_spec = &__afl_api_spec_initial;
 
-    printf("\n******************************************************************************: persistent loop: else: %d\n", *__afl_api_spec );
 
 
     return 0;

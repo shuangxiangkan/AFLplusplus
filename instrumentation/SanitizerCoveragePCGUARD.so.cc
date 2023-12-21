@@ -377,9 +377,9 @@ bool ModuleSanitizerCoverageAFL::instrumentModule(
   One = ConstantInt::get(IntegerType::getInt8Ty(Ctx), 1);
   Zero = ConstantInt::get(IntegerType::getInt8Ty(Ctx), 0);
 
-  // 这个变量是用来记录interesting basic block 的数量，interesting basic block 是指 这个basic block中包含这样的指令，
-  // (1). 指令的操作数是大于或者等于两个参数（或者间接参数，也就是操作数的操作数...是函数参数）
-  // (2). 指令的操作数是参数（或者间接参数，如(1)），且该指令的左值是返回值
+  // This variable is used to record the number of interesting basic blocks. An interesting basic block is defined as a basic block that contains instructions which:
+  // (1). Have operands that are greater than or equal to two arguments (or indirect arguments, meaning the operands of the operands are function arguments).
+  // (2). Have operands that are arguments (or indirect arguments, as in (1)), and the left-hand side of the instruction is a return value.
   AFLApiSpec = new GlobalVariable(M, PointerType::get(Int32Ty, 0), false, 
                         GlobalValue::ExternalLinkage, 0, "__afl_api_spec");
 
@@ -433,12 +433,11 @@ bool ModuleSanitizerCoverageAFL::instrumentModule(
   SanCovTracePCGuard =
       M.getOrInsertFunction(SanCovTracePCGuardName, VoidTy, Int32PtrTy);
 
-  // functionNames = loadFunctionNamesFromFile("functions.txt");
+  // Record functions that need will be instrumented
   std::ifstream file("functions.txt");
   std::string line;
 
   while (std::getline(file, line)) {
-    printf("===================== %s\n", line.c_str());
     functionNames.insert(line);
   }
 
@@ -541,7 +540,7 @@ static bool shouldInstrumentBlock(const Function &F, const BasicBlock *BB,
 
 }
 
-// 从文件中读取函数名并存储在集合中
+// Read function names from the file and store them in a collection
 std::set<std::string> loadFunctionNamesFromFile(const std::string &filename) 
 {
   std::set<std::string> functionNames;
@@ -555,16 +554,15 @@ std::set<std::string> loadFunctionNamesFromFile(const std::string &filename)
   return functionNames;
 }
 
-// 递归检查一个指令的结果是否作为返回值
+// Recursively check if the result of an instruction is used as a return value
 bool isResultUsedAsReturnValue(const Instruction &I) 
 {
-  // 本身就是return指令
+  // It is a return instruction itself
   if (const ReturnInst *RI = dyn_cast<ReturnInst>(&I)) 
     return true;
-  // 创建一个集合来跟踪已经检查过的指令，防止循环依赖
+  // Create a set to track the instructions that have been checked to prevent circular dependencies
   std::set<const Instruction *> checkedInstructions;
-  
-  // 创建一个栈，用于递归处理用户的用户
+
   std::stack<const Instruction *> toCheck;
   toCheck.push(&I);
 
@@ -575,7 +573,6 @@ bool isResultUsedAsReturnValue(const Instruction &I)
 
     if (checkedInstructions.count(instr)) 
     {
-      // 防止循环依赖
       continue;
     }
 
@@ -589,7 +586,6 @@ bool isResultUsedAsReturnValue(const Instruction &I)
       } 
       else if (const Instruction *userInstr = dyn_cast<Instruction>(U)) 
       {
-        // 如果用户也是指令，将其添加到递归栈中
         toCheck.push(userInstr);
       }
     }
@@ -597,27 +593,17 @@ bool isResultUsedAsReturnValue(const Instruction &I)
   return false;
 }
 
-// 递归检查一个值是否是参数或者间接是参数
 bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues) 
 {
-  // printf("\n");
-  // V->print(llvm::outs());
-  // printf("\n");
   if (checkedValues.count(V)) 
   {
-    return false; // 防止循环依赖
+    return false; 
   }
 
-  // checkedValues.insert(V);
-
-  if (isa<Argument>(V) && !checkedValues.count(V)) 
-  // if (isa<Argument>(V)) 
+  if (isa<Argument>(V) && !checkedValues.count(V))  
   {
-    printf("\n--------------------------- Argument ---------------------------\n");
-    V->print(llvm::outs());
-    printf("\n--------------------------- Argument ---------------------------\n");
     checkedValues.insert(V);
-    return true; // 如果是参数，返回 true
+    return true; 
   }
 
   checkedValues.insert(V);
@@ -636,12 +622,6 @@ bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues)
 
   for (User *U : V->users()) {
     if (Instruction *I = dyn_cast<Instruction>(U)) {
-      // if (isArgumentOrIndirectArgument(I, checkedValues)) {
-      //   return true;
-      // }
-      // printf("\n---user---\n");
-      // I->print(llvm::outs());
-      // printf("\n---user---\n");
       for (int opIdx = 0; opIdx < I->getNumOperands(); ++opIdx) 
       {
         Value *operand = I->getOperand(opIdx);
@@ -653,7 +633,6 @@ bool isArgumentOrIndirectArgument(Value *V, std::set<Value *> &checkedValues)
     }
   }
 
-  
   return false;
 }
 
@@ -661,56 +640,30 @@ static bool shouldSpecInstrumentBlock(const Function &F, const BasicBlock *BB)
 {
   for (const Instruction &I : *BB)
   {
-    // printf("\n--------------------------- Instruction ---------------------------\n");
-    // I.print(llvm::outs());
-    // printf("\n--------------------------- Instruction ---------------------------\n");
     int paramOperandsCount = 0;
 
-    std::set<Value *> checkedValues; // 用于跟踪已经检查过的值
+    std::set<Value *> checkedValues; 
 
-    // 检查每个操作数是否是参数
     for (int opIdx = 0; opIdx < I.getNumOperands(); ++opIdx) 
     {
       Value *operand = I.getOperand(opIdx);
-      // if (isa<Argument>(operand)) 
       if (isArgumentOrIndirectArgument(operand, checkedValues))
       {
-        printf("\n--------------------------- operand ---------------------------\n");
         Value *operand = I.getOperand(opIdx);
-        operand->print(llvm::outs());
-        printf("\n--------------------------- operand ---------------------------\n");
-        // operand->print(llvm::outs());
-        // 如果操作数是参数，增加计数
         paramOperandsCount++;
-        printf("\nparamOperandsCount: %d\n", paramOperandsCount);
       }
     }
 
-    // 如果有至少一条指令的大于等于 2 个操作数都是参数，或者其中的一条指令的至少一个操作数是参数
-    // if (paramOperandsCount >= 2 || (paramOperandsCount >= 1 && isResultUsedAsReturnValue(I))) 
-    // {
-    //   return true;
-    // }
-
     if (paramOperandsCount >= 2)
     {
-      printf("\n---------------------------------------------------- paramOperandsCount >= 2\n");
-      I.print(llvm::outs());
-      printf("\n---------------------------------------------------- paramOperandsCount >= 2\n");
       for (int opIdx = 0; opIdx < I.getNumOperands(); ++opIdx) 
       {
         Value *operand = I.getOperand(opIdx);
-        printf("\n--------------------------- operand ---------------------------\n");
-        operand->print(llvm::outs());
-        printf("\n--------------------------- operand ---------------------------\n");
       }
       return true;
     }
     else if (paramOperandsCount == 1)
     {
-      // printf("\n");
-      // I.print(llvm::outs());
-      // printf("\n");
       if (const ReturnInst *retInst = dyn_cast<ReturnInst>(&I))
       {
         return true;
@@ -992,9 +945,6 @@ bool ModuleSanitizerCoverageAFL::InjectCoverage(
 
     if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, &BB))
     {
-      printf("---------------------  符合条件的基本块！！！\n");
-      BB.print(llvm::outs());
-      printf("---------------------  符合条件的基本块！！！\n");
       InjectSpecificationAtBlock(F, BB);
     }
 
@@ -1248,15 +1198,7 @@ bool ModuleSanitizerCoverageAFL::InjectCoverage(
   if (!AllBlocks.empty())
     for (size_t i = 0, N = AllBlocks.size(); i < N; i++)
     {
-      // printf("\n***************************** Allblocks size: %d\n", AllBlocks.size());
       InjectCoverageAtBlock(F, *AllBlocks[i], i, IsLeafFunc);
-      // if (!functionNames.empty() && functionNames.find(F.getName().str()) != functionNames.end() && shouldSpecInstrumentBlock(F, AllBlocks[i]))
-      // {
-      //   printf("---------------------  符合条件的基本块！！！\n");
-      //   AllBlocks[i]->print(llvm::outs());
-      //   printf("---------------------  符合条件的基本块！！！\n");
-      //   InjectSpecificationAtBlock(F, *AllBlocks[i]);
-      // }
     }
 
   return true;
@@ -1468,19 +1410,18 @@ void ModuleSanitizerCoverageAFL::InjectSpecificationAtBlock(Function &F, BasicBl
 {
   BasicBlock::iterator IP = BB.getFirstInsertionPt();
   IRBuilder<> IRB(&*IP);
-  // 创建一个Load指令，用于加载全局变量的的指针
+  // Create a Load instruction for loading a pointer to a global variable.
   LoadInst *LoadAFLApiSpecPtr = IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLApiSpec);
   SetNoSanitizeMetadata(LoadAFLApiSpecPtr);
 
-  // 创建一个Load指令，用于加载全局变量的的值
+  // Create a Load instruction for loading the value of a global variable.
   LoadInst *LoadAFLApiSpec = IRB.CreateLoad(IRB.getInt32Ty(), LoadAFLApiSpecPtr);
   SetNoSanitizeMetadata(LoadAFLApiSpec);
 
-  // 创建一个Add指令，将AFLApiSpec加1
+  // Create an Add instruction to increment AFLApiSpec by 1.
   Value *NewValue = IRB.CreateAdd(LoadAFLApiSpec, ConstantInt::get(IntegerType::getInt32Ty(F.getContext()), 1));
-  // SetNoSanitizeMetadata(NewValue);
 
-  // 创建一个Store指令，将新值存回全局变量
+  // Create a Store instruction to store the new value back into the global variable.
   StoreInst *StoreAFLApiSpec = IRB.CreateStore(NewValue, LoadAFLApiSpecPtr);
   SetNoSanitizeMetadata(StoreAFLApiSpec);
 

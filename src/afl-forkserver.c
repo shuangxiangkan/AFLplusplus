@@ -944,7 +944,6 @@ void afl_fsrv_start(afl_forkserver_t *fsrv, char **argv,
     set_sanitizer_defaults();
 
     // execv()
-    printf("--------------------------------------execv: %s\n", fsrv->target_path);
     fsrv->init_child_func(fsrv, argv);
 
     /* Use a distinctive bitmap signature to tell the parent about execv()

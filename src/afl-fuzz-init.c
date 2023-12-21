@@ -876,7 +876,6 @@ void perform_dry_run(afl_state_t *afl) {
   u32                 cal_failures = 0, idx;
   u8                 *use_mem;
 
-  printf("  ------------------------------  afl->queued_items: %d\n", afl->queued_items);
 
   for (idx = 0; idx < afl->queued_items; idx++) {
 
@@ -905,8 +904,6 @@ void perform_dry_run(afl_state_t *afl) {
     u32 read_len = MIN(q->len, (u32)MAX_FILE);
     use_mem = afl_realloc(AFL_BUF_PARAM(in), read_len);
     ck_read(fd, use_mem, read_len, q->fname);
-
-    printf("  ------------------------------  use_mem content: %s\n", use_mem);
 
     close(fd);
 
@@ -1349,8 +1346,6 @@ void perform_dry_run(afl_state_t *afl) {
 
     afl->max_depth = 0;
 
-    printf("  ------------------------------  afl->queued_items: %d\n", afl->queued_items);
-
     for (idx = 0; idx < afl->queued_items; idx++) {
 
       if (afl->queue_buf[idx] && !afl->queue_buf[idx]->disabled &&
@@ -1362,8 +1357,6 @@ void perform_dry_run(afl_state_t *afl) {
     afl->queue_top = afl->queue;
 
   }
-
-  printf("  ------------------------------  afl->queued_items: %d\n", afl->queued_items);
 
   OKF("All test cases processed.");
 

@@ -347,7 +347,7 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
 #else
 
-  printf (" --- afl->custom_mutators_count: %d\n", afl->custom_mutators_count);
+
   if (unlikely(afl->custom_mutators_count)) {
 
     /* The custom mutator will decide to skip this test case or not. */
@@ -430,14 +430,6 @@ u8 fuzz_one_original(afl_state_t *afl) {
   out_buf = afl_realloc(AFL_BUF_PARAM(out), len);
   if (unlikely(!out_buf)) { PFATAL("alloc"); }
 
-  printf(" --- out_buf: %s\n", out_buf);
-  // printf(" --- size of out_buf: %d\n", sizeof(out_buf));
-  // printf(" --- size of *out_buf: %d\n", sizeof(*out_buf));
-  printf(" --- in_buf: %s\n", in_buf);
-  // printf(" --- size of in_buf: %d\n", sizeof(in_buf));
-  printf(" --- len: %d\n", len);
-  // printf(" --- size of char: %d\n", sizeof(char));
-
   afl->subseq_tmouts = 0;
 
   afl->cur_depth = afl->queue_cur->depth;
@@ -510,105 +502,6 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   }
 
-  printf(" ------ out_buf: %s\n", out_buf);
-  // printf(" ------ in_buf: %s\n", in_buf);
-  // printf(" ------ len: %d\n", len);
-  memcpy(out_buf, in_buf, len);
-  printf(" ------ out_buf: %s\n", out_buf);
-  printf(" ------ in_buf: %s\n", in_buf);
-
-  printf(" --- afl->fsrv.spec_num: %d\n", *afl->fsrv.spec_num);
-  printf(" --- afl->queue_cur->was_fuzzed: %d\n", afl->queue_cur->was_fuzzed);
-  printf(" --- afl->queue_cur->spec_num: %d\n", afl->queue_cur->spec_num);
-  printf(" --- afl->queue_cur->spec_loop_count: %d\n", afl->queue_cur->spec_loop_count);
-  if (afl->queue_cur->spec_num && afl->queue_cur->spec_loop_count < SPEC_MAX_LOOP)
-  {
-    afl->stage_short = "spec";
-    afl->stage_max = SPEC_MAX_LOOP;
-    afl->stage_name = "specification";
-
-    for (afl->stage_cur = afl->queue_cur->spec_loop_count; afl->stage_cur < afl->stage_max; ++afl->stage_cur) 
-    {
-      u8* out_buf_copy = (u8*)malloc(len);
-      memcpy(out_buf_copy, out_buf, len);
-
-      // 使用当前时间作为随机数生成器的种子
-      srand(time(NULL));
-
-      // 生成随机的 start1 和 len1
-      int start1 = rand() % len;
-      int len1 = rand() % (len - start1) + 1;
-
-      // 生成随机的 start2 和 len2
-      int start2 = rand() % len;
-      int len2 = rand() % (len - start2) + 1;
-
-      // 打印替换前的数据和需要替换的数据
-      printf("Original: %s\n", out_buf);
-      printf("Start1: %d, Len1: %d\n", start1, len1);
-      printf("Start2: %d, Len2: %d\n", start2, len2);
-
-      // 打印需要替换的数据内容
-      u8* data1 = out_buf + start1;
-      u8* data2 = out_buf + start2;
-      printf("Data to be replaced (start1): %.*s\n", len1, data1);
-      printf("Data to be replaced (start2): %.*s\n", len2, data2);
-
-      // 计算新的长度并扩容 out_buf
-      int new_len = len - len2 + len1;
-      u8* new_buf = (u8*)malloc(new_len);
-
-      // 逐段拼接数据
-      memcpy(new_buf, out_buf, start2); // 复制前半部分
-      memcpy(new_buf + start2, data1, len1); // 复制第一段替换的数据
-      memcpy(new_buf + start2 + len1, out_buf + start2 + len2, len - (start2 + len2)); // 复制剩余部分
-
-      printf("Replaced: %s\n", new_buf); // 打印替换后的数据
-
-      // 释放原有的 out_buf 和更新指针
-      // free(out_buf);
-      // out_buf = new_buf;
-      out_buf = afl_realloc(AFL_BUF_PARAM(out), new_len);
-      memset(out_buf, 0, new_len);
-      memcpy(out_buf, new_buf, new_len);
-
-      // len = new_len;
-
-      // 在程序结束前释放内存
-      free(new_buf);
-
-
-      
-      // 输出结果
-      printf("New out_buf: %s\n", out_buf);
-
-      u32 spec_num_cur = afl->queue_cur->spec_num;
-      printf(" --- afl->stage_cur: %d\n", afl->stage_cur);
-      printf(" --- out_buf: %s\n", out_buf);
-      if (common_fuzz_stuff(afl, out_buf, len)) 
-      { 
-        afl->queue_cur->spec_loop_count = afl->stage_cur;
-        // Restore out_buf
-        out_buf = afl_realloc(AFL_BUF_PARAM(out), len);
-        memcpy(out_buf, out_buf_copy, len);
-        free(out_buf_copy);
-        printf(" --- out_buf: %s\n", out_buf);
-
-        goto abandon_entry; 
-      }
-
-      if (afl->queue_cur->spec_num > spec_num_cur)
-      {
-        afl->queue_cur->spec_loop_count = 0;
-        afl->stage_cur = 0;
-      }
-
-      printf(" --- afl->queue_cur->spec_num: %d\n", afl->queue_cur->spec_num);
-        
-    }
-  }
-  
-
   /*********************
    * PERFORMANCE SCORE *
    *********************/
@@ -621,8 +514,6 @@ u8 fuzz_one_original(afl_state_t *afl) {
 
   if (unlikely(perf_score <= 0 && afl->active_items > 1)) 
   {
-    printf(" --- perf_score: %d\n", perf_score);
-    printf(" --- active_items: %d\n", afl->active_items);
     goto abandon_entry;
 
   }
@@ -682,6 +573,24 @@ u8 fuzz_one_original(afl_state_t *afl) {
   }
 
   doing_det = 1;
+
+int mutation_choice = rand() % 100;
+
+if (mutation_choice >= 80) {
+  if (mutation_choice < 83) {
+    goto custom_copy;
+  } else if (mutation_choice < 86) {
+    goto custom_partial_copy;
+  } else if (mutation_choice < 89) {
+    goto custom_swap;
+  } else if (mutation_choice < 92) {
+    goto custom_partial_swap;
+  } else if (mutation_choice < 95) {
+    goto custom_content_append;
+  } else {
+    goto custom_partial_append;
+  }
+}
 
   /*********************************************
    * SIMPLE BITFLIP (+dictionary construction) *
@@ -836,9 +745,7 @@ u8 fuzz_one_original(afl_state_t *afl) {
     afl->stage_cur_byte = afl->stage_cur >> 3;
 
     FLIP_BIT(out_buf, afl->stage_cur);
-    printf(" --- out_buf: %s\n", out_buf);
     FLIP_BIT(out_buf, afl->stage_cur + 1);
-    printf(" --- out_buf: %s\n", out_buf);
 
 #ifdef INTROSPECTION
     snprintf(afl->mutation, sizeof(afl->mutation), "%s FLIP_BIT2-%u",
@@ -848,9 +755,7 @@ u8 fuzz_one_original(afl_state_t *afl) {
     if (common_fuzz_stuff(afl, out_buf, len)) { goto abandon_entry; }
 
     FLIP_BIT(out_buf, afl->stage_cur);
-    printf(" --- out_buf: %s\n", out_buf);
     FLIP_BIT(out_buf, afl->stage_cur + 1);
-    printf(" --- out_buf: %s\n", out_buf);
 
   }
 
@@ -1979,6 +1884,192 @@ skip_extras:
      in the .state/ directory. */
 
   if (!afl->queue_cur->passed_det) { mark_as_det_done(afl, afl->queue_cur); }
+
+
+custom_copy:
+
+afl->stage_name = "custom copy mutation";
+afl->stage_short = "copy_mut";
+afl->stage_max = len - 4;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_copy = malloc(len);
+memcpy(orig_buf_copy, out_buf, len);
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 block_start = rand() % (len / 2);
+  u32 block_size = 1 + rand() % ((len / 2) - block_start);
+  u32 dest_start = (len / 2) + rand() % (len / 2);
+  if (dest_start + block_size > len) block_size = len - dest_start;
+  memmove(out_buf + dest_start, out_buf + block_start, block_size);
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_copy);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_copy, len);
+  ++afl->stage_cur;
+}
+free(orig_buf_copy);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_COPY_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_COPY_MUT] += afl->stage_max;
+
+custom_partial_copy:
+
+afl->stage_name = "custom partial copy mutation";
+afl->stage_short = "part_copy_mut";
+afl->stage_max = len - 2;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_partial_copy = malloc(len);
+memcpy(orig_buf_partial_copy, out_buf, len);
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 copy_start = rand() % len;
+  u32 dest_start = rand() % len;
+  out_buf[dest_start] = out_buf[copy_start];
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_partial_copy);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_partial_copy, len);
+  ++afl->stage_cur;
+}
+free(orig_buf_partial_copy);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_PART_COPY_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_PART_COPY_MUT] += afl->stage_max;
+
+custom_swap:
+
+afl->stage_name = "custom swap mutation";
+afl->stage_short = "swap_mut";
+afl->stage_max = len / 2;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_swap = malloc(len);
+memcpy(orig_buf_swap, out_buf, len);
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 block1_start = rand() % (len / 2);
+  u32 block1_size = 1 + rand() % ((len / 2) - block1_start);
+  u32 block2_start = (len / 2) + rand() % (len / 2);
+  u32 block2_size = 1 + rand() % (len - block2_start);
+  u32 min_size = block1_size < block2_size ? block1_size : block2_size;
+  u8 *temp = (u8 *)malloc(min_size);
+  memcpy(temp, out_buf + block1_start, min_size);
+  memcpy(out_buf + block1_start, out_buf + block2_start, min_size);
+  memcpy(out_buf + block2_start, temp, min_size);
+  free(temp);
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_swap);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_swap, len);
+  ++afl->stage_cur;
+}
+free(orig_buf_swap);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_SWAP_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_SWAP_MUT] += afl->stage_max;
+
+custom_partial_swap:
+
+afl->stage_name = "custom partial swap mutation";
+afl->stage_short = "part_swap_mut";
+afl->stage_max = len - 2;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_partial_swap = malloc(len);
+memcpy(orig_buf_partial_swap, out_buf, len);
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 pos1 = rand() % len;
+  u32 pos2 = rand() % len;
+  u8 temp = out_buf[pos1];
+  out_buf[pos1] = out_buf[pos2];
+  out_buf[pos2] = temp;
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_partial_swap);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_partial_swap, len);
+  ++afl->stage_cur;
+}
+free(orig_buf_partial_swap);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_PART_SWAP_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_PART_SWAP_MUT] += afl->stage_max;
+
+custom_content_append:
+
+afl->stage_name = "custom content append mutation";
+afl->stage_short = "cont_append_mut";
+afl->stage_max = len / 2;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_content_append = malloc(len);
+memcpy(orig_buf_content_append, out_buf, len);
+u32 orig_len_content_append = len;
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 append_start = rand() % len;
+  u32 append_size = 1 + rand() % (len - append_start);
+  memcpy(out_buf + len, out_buf + append_start, append_size);
+  len += append_size;
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_content_append);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_content_append, orig_len_content_append);
+  len = orig_len_content_append;
+  ++afl->stage_cur;
+}
+free(orig_buf_content_append);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_CONT_APPEND_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_CONT_APPEND_MUT] += afl->stage_max;
+
+custom_partial_append:
+
+afl->stage_name = "custom partial append mutation";
+afl->stage_short = "part_append_mut";
+afl->stage_max = len;
+orig_hit_cnt = new_hit_cnt;
+
+u8 *orig_buf_partial_append = malloc(len);
+memcpy(orig_buf_partial_append, out_buf, len);
+u32 orig_len_partial_append = len;
+
+for (i = 0; i < afl->stage_max; ++i) {
+  u32 append_pos = rand() % len;
+  out_buf[len] = out_buf[append_pos];
+  len++;
+
+  if (common_fuzz_stuff(afl, out_buf, len)) { 
+    free(orig_buf_partial_append);
+    goto abandon_entry; 
+  }
+  memcpy(out_buf, orig_buf_partial_append, orig_len_partial_append);
+  len = orig_len_partial_append;
+  ++afl->stage_cur;
+}
+free(orig_buf_partial_append);
+
+new_hit_cnt = afl->queued_items + afl->saved_crashes;
+afl->stage_finds[STAGE_PART_APPEND_MUT] += new_hit_cnt - orig_hit_cnt;
+afl->stage_cycles[STAGE_PART_APPEND_MUT] += afl->stage_max;
+
 
 custom_mutator_stage:
   /*******************

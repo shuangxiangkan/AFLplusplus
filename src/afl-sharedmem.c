@@ -303,7 +303,7 @@ u8 *afl_shm_init(sharedmem_t *shm, size_t map_size,
 
     shm_str = alloc_printf("%d", shm->shm_id);
 
-    printf("shm_str: %s\n", shm_str);
+    // printf("shm_str: %s\n", shm_str);
 
     /* If somebody is asking us to fuzz instrumented binaries in
        non-instrumented mode, we don't want them to detect instrumentation,
